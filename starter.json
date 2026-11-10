@@ -1,0 +1,21 @@
+{
+  "name": "Jigsaw Jam",
+  "genre": "puzzle",
+  "dim": "2D",
+  "mode": "Co-op",
+  "players": "1–8",
+  "hook": "Build a fresh jigsaw together, piece by piece.",
+  "how": "Every round paints a new picture and cuts it into 36 pieces. Drag pieces into the frame and they snap into place when they're close. A piece you're holding is yours until you let go, so nobody can snatch it. Finish fast to get on the board.",
+  "controls": "Drag pieces with the mouse or a finger; drag the table to look around, scroll or pinch to zoom",
+  "uses": [
+    ["Host-run rules", "The host's browser decides who holds each piece and when one snaps; if it leaves, the next player takes over."],
+    ["Bots", "Helper bots fit pieces alongside you when the room is quiet."],
+    ["Leaderboard", "The fastest finished puzzle."],
+    ["Live sync", "Everyone's cursor and the piece in their hand move live for the whole table."]
+  ],
+  "ideas": [
+    "Use 64 smaller pieces for a harder puzzle",
+    "Paint space scenes with planets and rockets",
+    "Let pieces turn, and right-click to rotate them"
+  ]
+}
