@@ -23,7 +23,7 @@
   .card { width: min(380px, calc(100vw - 32px)); max-height: 86vh; overflow: auto; padding: 22px; border-radius: 16px; background: #4a3428; border: 1px solid #ffffff22; text-align: center; box-sizing: border-box; }
   .card h2 { margin: 0 0 4px; font-size: 26px; color: #ffd98a; }
   .card h3 { margin: 14px 0 4px; font-size: 14px; color: #ffb36b; text-align: left; }
-  .card ol { text-align: left; margin: 0; padding-left: 24px; font-size: 14px; } .card li span { float: right; font-variant-numeric: tabular-nums; }
+  .card ol { text-align: left; margin: 0; padding-left: 24px; font-size: 14px; } .card li span { float: right; font-variant-numeric: tabular-nums; } .card li.note { list-style: none; margin-left: -24px; opacity: .8; }
   button.go { width: 100%; min-height: 48px; margin-top: 14px; border: 0; border-radius: 12px; background: #ffb36b; color: #2b1606; font: 800 17px system-ui, sans-serif; cursor: pointer; }
 </style>
 <script src="https://cdn.multiplayeragent.com/sdk/mp.global.js"></script>
@@ -38,7 +38,7 @@
 <div id="over" hidden><div class="card">
   <h2>Puzzle complete!</h2>
   <div id="doneText"></div>
-  <h3>Fastest puzzles</h3><ol id="board"><li>Loading…</li></ol>
+  <h3>Fastest puzzles</h3><ol id="board"><li class="note">Loading…</li></ol>
   <button class="go" id="again">New puzzle</button>
 </div></div>
 <script>
@@ -553,12 +553,12 @@ function showDone(g) {
   const mine = (g.tally || {})[net.sessionId];
   $("doneText").textContent = `${g.cols * g.rows} pieces in ${fmt(g.doneMs)}${mine ? ` · you placed ${mine[0]}` : ""}`;
   const list = $("board");
-  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
+  if (!board) { list.innerHTML = "<li class='note'>Leaderboards need a connection.</li>"; return; }
   const submit = me.played === g.id && me.submitted !== g.id ? board.submit(Math.max(0, 3600000 - g.doneMs)).catch(() => null) : Promise.resolve();
-  me.submitted = g.id; list.innerHTML = "<li>Loading…</li>";
+  me.submitted = g.id; list.innerHTML = "<li class='note'>Loading…</li>";
   submit.then(() => board.top(10)).then(({ entries }) => {
-    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${fmt(3600000 - e.score)}</span></li>`).join("") : "<li>No puzzles yet. Be the first.</li>";
-  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${fmt(3600000 - e.score)}</span></li>`).join("") : "<li class='note'>No puzzles yet. Be the first.</li>";
+  }).catch(() => { list.innerHTML = "<li class='note'>Couldn't load the leaderboard.</li>"; });
 }
 $("again").onclick = () => { const g = game(); if (!g || g.phase !== "done") return; if (isHost()) newRound(g.id + 1); else net.send("again", {}); };
 let audio = null;
@@ -593,7 +593,8 @@ function pieceAt(g, wx, wy) {
   return best;
 }
 cv.addEventListener("pointerdown", (e) => {
-  e.preventDefault(); wake(); try { cv.setPointerCapture(e.pointerId); } catch {}
+  e.preventDefault(); wake(); if (e.button !== 0) return; // right/middle click: nothing
+  try { cv.setPointerCapture(e.pointerId); } catch {}
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   [me.cx, me.cy] = toWorld(e.clientX, e.clientY);
   const g = game(); if (!g) return;
@@ -615,6 +616,8 @@ function release(e) {
 }
 cv.addEventListener("pointerup", release);
 cv.addEventListener("pointercancel", release);
+cv.addEventListener("contextmenu", (e) => e.preventDefault()); // right-click: no browser menu
+addEventListener("blur", () => { pointers.clear(); pinch = null; pan = null; drop(); }); // switching tabs mid-drag: let go of the piece
 cv.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(Math.pow(1.0015, -e.deltaY), e.clientX, e.clientY); }, { passive: false });
 addEventListener("keydown", (e) => { if (e.key === "+" || e.key === "=") zoomAt(1.25, W / 2, midY()); if (e.key === "-") zoomAt(0.8, W / 2, midY()); if (e.key === "0") cam.user = false; });
 document.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
