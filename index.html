@@ -67,7 +67,7 @@
  *     A new host adopts all of it from state.
  *   - The picture and the piece shapes come from `seed` (a seeded PRNG), so nothing but
  *     the seed is in state for them.
- *   - Everyone else sends intents: "grab" {i}, "drop" {i, x, y}, "again" {}. A piece you
+ *   - Everyone else sends intents: "grab" {i, r} (r = round id), "drop" {i, x, y}, "again" {}. A piece you
  *     hold is locked to you: the host refuses anyone else's grab. Your own moves show at
  *     once; if someone grabbed the piece first, it goes back.
  *   - ?attract plays offline with bots only (the preview video is recorded from it).
@@ -303,10 +303,10 @@ function adopt() {
   host.heldDirty = true;
 }
 const holderLive = (id) => host.bots.has(id) || livePlayers().includes(id);
-/** A "grab" intent: the piece becomes yours unless it's placed or someone else holds it. You hold one at a time. */
+/** A "grab" intent {i, r}: piece i of round r becomes yours unless it's placed or someone else holds it. You hold one at a time. */
 function applyGrab(from, m) {
-  const g = game(); if (!g || g.phase !== "play" || host.round !== g.id || !m) return false;
-  const i = m.i | 0, p = host.pieces[i]; if (!p || p.p) return false;
+  const g = game(); if (!g || g.phase !== "play" || host.round !== g.id || !m || m.r !== g.id || !Number.isInteger(m.i)) return false; // a grab sent in the last round, or a made-up piece number: ignored
+  const i = m.i, p = host.pieces[i]; if (!p || p.p) return false;
   const who = host.held[i]; if (who && who !== from && holderLive(who)) return false;
   for (const [k, id] of Object.entries(host.held)) if (id === from) delete host.held[k];
   host.held[i] = from; p.z = ++host.z; host.heldDirty = host.dirty = true;
@@ -316,7 +316,7 @@ function applyGrab(from, m) {
 /** A "drop" intent: let go of the piece at (x, y); close to its home it snaps in and stays. */
 function applyDrop(from, m) {
   const g = game(); if (!g || host.round !== g.id || !m) return;
-  const i = m.i | 0, p = host.pieces[i]; if (!p || host.held[i] !== from) return;
+  const i = m.i, p = Number.isInteger(i) ? host.pieces[i] : null; if (!p || host.held[i] !== from) return;
   delete host.held[i]; host.heldDirty = host.dirty = true;
   const x = clampX(g, +m.x), y = clampY(g, +m.y), hm = home(g, i);
   if (Math.hypot(x - hm.x, y - hm.y) < CONFIG.snap && g.phase === "play") {
@@ -389,7 +389,7 @@ function botTick(b, dt, now, g) {
   if (d > 0.001) { b.x += (dx / d) * step; b.y += (dy / d) * step; }
   if (b.hold >= 0) Object.assign(host.pieces[b.hold], { x: b.x - b.ox, y: b.y - b.oy }); // the host moves the bot's piece itself (sent with `bots`)
   if (d > 0.05) return;
-  if (b.target.stage === "fetch") { if (applyGrab(b.id, { i: b.target.i })) { b.hold = b.target.i; b.ox = b.target.ox; b.oy = b.target.oy; b.target.stage = "carry"; } else b.target = null; }
+  if (b.target.stage === "fetch") { if (applyGrab(b.id, { i: b.target.i, r: g.id })) { b.hold = b.target.i; b.ox = b.target.ox; b.oy = b.target.oy; b.target.stage = "carry"; } else b.target = null; }
   else { applyDrop(b.id, { i: b.hold, x: b.x - b.ox, y: b.y - b.oy }); b.hold = -1; b.target = null; b.readyAt = now + rnd(...CONFIG.botThinkMs); }
 }
 
@@ -402,7 +402,7 @@ const me = { cx: 0, cy: 0, hold: null, drop: null, cur: "", lastCur: 0, played: 
 function grab(i, wx, wy) {
   const g = game(), p = piecesNow(g)[i]; if (!p || p.p || ATTRACT) return;
   me.hold = { i, ox: wx - p.x, oy: wy - p.y, at: performance.now() };
-  if (isHost()) { if (!applyGrab(net.sessionId, { i })) me.hold = null; } else net.send("grab", { i });
+  if (isHost()) { if (!applyGrab(net.sessionId, { i, r: g.id })) me.hold = null; } else net.send("grab", { i, r: g.id });
   sfx("pick");
 }
 /** Where the piece in my hand is: under the cursor, kept on the table. */
@@ -531,7 +531,7 @@ function toast(text) { const t = $("toast"); t.textContent = text; t.classList.a
 function hud(g, list) {
   if (ATTRACT) return;
   const placed = list.filter((p) => p.p).length;
-  $("stats").innerHTML = `Jigsaw Jam <small>${placed}/${list.length} placed · ${fmt(g.phase === "done" ? g.doneMs : g.startAt ? Date.now() - g.startAt : 0)}</small>`;
+  $("stats").innerHTML = `Jigsaw Jam <small>${placed}/${list.length} placed · ${fmt(g.phase === "done" ? g.doneMs : g.startAt ? Math.max(0, Date.now() - g.startAt) : 0)}</small>`;
   const rows = Object.entries(g.tally || {}).map(([id, [n, name, color]]) => ({ n, name: id === net.sessionId ? "You" : name, color })).sort((a, b) => b.n - a.n).slice(0, 6);
   $("who").innerHTML = rows.map((r) => `<div><span style="color:${esc(r.color)}">${esc(r.name)}</span><i>${r.n}</i></div>`).join("");
   const n = livePlayers().length;
